@@ -9,7 +9,7 @@ import numpy as np
 
 # === 配置超参数 ===
 EPOCHS = 300
-BATCH_SIZE = 64             # 增大批量大小
+BATCH_SIZE = 32             # 增大批量大小
 LEARNING_RATE = 0.001       # 增大学习率
 WEIGHT_DECAY = 0.005        # 减小L2正则化强度
 DATA_PATH = "train_data.xlsx"
@@ -37,11 +37,11 @@ val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE)
 input_dim = dataset[0][0].shape[-1]
 model = TransformerModel(
     input_dim=input_dim,
-    d_model=64,  # 减小模型维度
-    nhead=4,  # 减少注意力头数
-    num_layers=2,  # 减少层数
-    dim_feedforward=128,  # 减小前馈网络维度
-    dropout=0.3  # 增加dropout
+    d_model=128,        # 增加到128
+    nhead=8,           # 增加到8
+    num_layers=3,      # 增加到3
+    dim_feedforward=256, # 增加到256
+    dropout=0.2        # 适当减小dropout
 ).to(DEVICE)
 
 # === 优化器和学习率调度器 ===
@@ -50,22 +50,26 @@ optimizer = optim.AdamW(
     lr=LEARNING_RATE,
     weight_decay=WEIGHT_DECAY
 )
-scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+scheduler = optim.lr_scheduler.OneCycleLR(
     optimizer,
-    mode='min',
-    patience=7,      # 增加等待轮数
-    factor=0.7,      # 调整衰减因子
-    min_lr=1e-6
+    max_lr=0.001,
+    epochs=EPOCHS,
+    steps_per_epoch=len(train_loader),
+    pct_start=0.3,
+    anneal_strategy='cos'
 )
 
 
 
+
 # === 自定义复合损失函数 ===
-def composite_loss(pred, target, alpha=0.5, beta=0.5, epsilon=1e-3):
+def composite_loss(pred, target, alpha=0.6, beta=0.4, epsilon=1e-3):
+    # 增加MSE的权重
     mse = F.mse_loss(pred, target)
     denom = torch.clamp(torch.abs(target), min=epsilon)
     mape = torch.mean(torch.abs((pred - target) / denom))
     return alpha * mse + beta * mape
+
 
 
 # === 评估函数 ===

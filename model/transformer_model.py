@@ -15,18 +15,17 @@ class PositionalEncoding(nn.Module):
         self.register_buffer('pe', pe)
 
     def forward(self, x):
-        return x + self.pe[:, :x.size(1)]
+        return x + self.pe[:, :x.size(1), :x.size(2)]  # 修改这里以支持正确的维度
 
 class TransformerModel(nn.Module):
-    def __init__(self, input_dim=6, d_model=64, nhead=4, num_layers=2, dim_feedforward=128, dropout=0.2):
+    def __init__(self, input_dim=6, d_model=128, nhead=8, num_layers=3, dim_feedforward=256, dropout=0.2):
         super(TransformerModel, self).__init__()
 
-        # 特征投影层
+        # 特征投影层 - 确保输出维度与d_model匹配
         self.input_projection = nn.Sequential(
-            nn.Linear(input_dim, 128),
+            nn.Linear(input_dim, d_model),  # 直接投影到d_model维度
             nn.ReLU(),
-            nn.Dropout(dropout),
-            nn.Linear(128, 64)
+            nn.Dropout(dropout)
         )
 
         self.pos_encoder = PositionalEncoding(d_model)
@@ -45,14 +44,14 @@ class TransformerModel(nn.Module):
 
         # 解码器
         self.decoder = nn.Sequential(
-            nn.Linear(64, 32),
+            nn.Linear(d_model, d_model//2),  # 从d_model降维
             nn.ReLU(),
             nn.Dropout(dropout),
-            nn.Linear(32, 1)
+            nn.Linear(d_model//2, 1)
         )
 
     def forward(self, src):
-        src = self.input_projection(src)
+        src = self.input_projection(src)  # [batch_size, seq_len, d_model]
         src = self.pos_encoder(src)
         src = self.norm_first(src)
         output = self.transformer_encoder(src)
